@@ -58,7 +58,7 @@ namespace ProcessPriorityControl.Cmd
             ShortName = process.ProcessName;
             FullPath = process.MainModule.FileName;
             User = GetUserInformation();
-            Hash = Utility.GetMd5HashPrefixed(FullPath);
+            Hash = Utility.GetMd5HashPrefixed(FullPath.ToLower());
         }
 
         public void RecordProcessInformation()

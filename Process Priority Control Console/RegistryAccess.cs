@@ -30,6 +30,11 @@ namespace ProcessPriorityControl.Cmd
         private static readonly string RulesBasePath = RegistryBasePath + @"\Rules";
 
         /// <summary>
+        /// Value name to track changes between background process and admin process.
+        /// </summary>
+        private static readonly string ChangesMade = "ChangesMade";
+
+        /// <summary>
         /// Set up the initial structure for the data stored in the registry.
         /// </summary>
         public static void RegistrySetup()
@@ -41,6 +46,11 @@ namespace ProcessPriorityControl.Cmd
             Registry.SetValue(UserInformationBasePath, string.Empty, string.Empty);
             Registry.SetValue(ProcessInformationBasePath, string.Empty, string.Empty);
             Registry.SetValue(RulesBasePath, string.Empty, string.Empty);
+
+            Registry.SetValue(RulesBasePath + @"\Full path", string.Empty, string.Empty);
+            Registry.SetValue(RulesBasePath + @"\Short name", string.Empty, string.Empty);
+            Registry.SetValue(RulesBasePath + @"\Partial", string.Empty, string.Empty);
+            Registry.SetValue(RulesBasePath + @"\Username", string.Empty, string.Empty);
         }
 
         /// <summary>
@@ -206,7 +216,7 @@ namespace ProcessPriorityControl.Cmd
             foreach (string partialHash in partialsKey.GetSubKeyNames())
             {
                 string partial = Registry.GetValue(RulesBasePath + @"\Partial\" + partialHash, string.Empty, null)?.ToString();
-                if (partial != string.Empty && process.FullPath.Contains(partial))
+                if (partial != string.Empty && process.FullPath.ToLower().Contains(partial.ToLower()))
                 {
                     object result = Registry.GetValue(RulesBasePath + @"\Partial\" + partialHash, "Priority", null);
 
@@ -223,7 +233,7 @@ namespace ProcessPriorityControl.Cmd
 
         public static void SetPartialRule(string partialPath, Priority priority)
         {
-            string hash = Utility.GetMd5HashPrefixed(partialPath);
+            string hash = Utility.GetMd5HashPrefixed(partialPath.ToLower());
 
             Registry.SetValue(RulesBasePath + @"\Partial\" + hash, string.Empty, partialPath, RegistryValueKind.String);
             Registry.SetValue(RulesBasePath + @"\Partial\" + hash, "Priority", priority, RegistryValueKind.DWord);
@@ -252,5 +262,20 @@ namespace ProcessPriorityControl.Cmd
             Registry.SetValue(RulesBasePath + @"\Username", process.UserSids[0], priority, RegistryValueKind.DWord);
         }
 
+        public static void SetChangesMade()
+        {
+            Registry.SetValue(RegistryBasePath, ChangesMade, 1, RegistryValueKind.DWord);
+        }
+
+        public static void ClearChangesMade()
+        {
+            Registry.SetValue(RegistryBasePath, ChangesMade, 0, RegistryValueKind.DWord);
+        }
+
+        public static bool GetChangesMade()
+        {
+            string result = Registry.GetValue(RegistryBasePath, ChangesMade, null)?.ToString();
+            return result == "1";
+        }
     }
 }

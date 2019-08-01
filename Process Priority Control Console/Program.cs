@@ -30,6 +30,8 @@ namespace ProcessPriorityControl.Cmd
             // Set up the registry structure.
             RegistryAccess.RegistrySetup();
 
+            //ConfigurationMode();
+
             if (args.Length >= 1 && args[0] == "config")
             {
                 // Configuration mode.
@@ -40,13 +42,21 @@ namespace ProcessPriorityControl.Cmd
             {
                 // Runtime mode.
 
-                //ListenForProcesses();
+                RegistryAccess.ClearChangesMade();
 
                 bool first = true;
                 while (true)
                 {
                     // Repeat... forever.
                     Thread.Sleep(500);
+
+                    if (RegistryAccess.GetChangesMade())
+                    {
+                        Console.WriteLine("Changes detected from configuration mode, resetting...");
+                        activeProcesses.Clear();
+                        RegistryAccess.ClearChangesMade();
+                        first = true;
+                    }
 
                     Process[] processes = Process.GetProcesses();
                     processTrackingHelper = new HashSet<int>(activeProcesses.Keys);
@@ -86,6 +96,8 @@ namespace ProcessPriorityControl.Cmd
         /// </summary>
         private static void ConfigurationMode()
         {
+            bool changesMade = false;
+
             // Loop through all processes that have been observed.
             foreach (ProcessWithRules process in RegistryAccess.GetObservedProcesses())
             {
@@ -116,6 +128,8 @@ namespace ProcessPriorityControl.Cmd
 
                     if (priorityChoice != "s")
                     {
+                        changesMade = true;
+
                         switch (priorityChoice)
                         {
                             case "i":
@@ -172,6 +186,10 @@ namespace ProcessPriorityControl.Cmd
                 Console.WriteLine();
             }
 
+            if (changesMade)
+            {
+                RegistryAccess.SetChangesMade();
+            }
         }
 
         /// <summary>
