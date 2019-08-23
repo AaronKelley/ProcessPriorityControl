@@ -126,12 +126,21 @@ namespace ProcessPriorityControl.Cmd
             }
         }
 
+        /// <summary>
+        /// Given a user SID, get the username.
+        /// </summary>
+        /// <param name="sid">User SID</param>
+        /// <returns>Username</returns>
         public static string GetUsernameFromSid(string sid)
         {
             return Registry.GetValue(UserInformationBasePath + @"\" + sid, "Domain", null)?.ToString() + @"\" +
                    Registry.GetValue(UserInformationBasePath + @"\" + sid, "Username", null)?.ToString();
         }
 
+        /// <summary>
+        /// Get a list of all processes that have been observed.
+        /// </summary>
+        /// <returns>List of processes</returns>
         public static List<ProcessWithRules> GetObservedProcesses()
         {
             List<ProcessWithRules> processes = new List<ProcessWithRules>();
@@ -174,6 +183,11 @@ namespace ProcessPriorityControl.Cmd
             return processes;
         }
 
+        /// <summary>
+        /// Given a process, get the full path rule (if one exists)
+        /// </summary>
+        /// <param name="process"></param>
+        /// <returns>Full path rule, NULL if none</returns>
         public static Priority? GetFullPathRule(ProcessWithRules process)
         {
             object result = Registry.GetValue(RulesBasePath + @"\Full path", process.Hash, null);
@@ -187,11 +201,21 @@ namespace ProcessPriorityControl.Cmd
             return null;
         }
 
+        /// <summary>
+        /// Set a full path rule for a given process.
+        /// </summary>
+        /// <param name="process">A process</param>
+        /// <param name="priority">Priority to set</param>
         public static void SetFullPathRule(ProcessWithRules process, Priority priority)
         {
             Registry.SetValue(RulesBasePath + @"\Full path", process.Hash, priority, RegistryValueKind.DWord);
         }
 
+        /// <summary>
+        /// Given a process, get the short name rule (if one exists)
+        /// </summary>
+        /// <param name="process"></param>
+        /// <returns>Short name rule, NULL if none</returns>
         public static Priority? GetShortNameRule(ProcessWithRules process)
         {
             object result = Registry.GetValue(RulesBasePath + @"\Short name", process.ShortName, null);
@@ -205,11 +229,21 @@ namespace ProcessPriorityControl.Cmd
             return null;
         }
 
+        /// <summary>
+        /// Set a short name rule for a given process.
+        /// </summary>
+        /// <param name="process">A process</param>
+        /// <param name="priority">Priority to set</param>
         public static void SetShortNameRule(ProcessWithRules process, Priority priority)
         {
             Registry.SetValue(RulesBasePath + @"\Short name", process.ShortName, priority, RegistryValueKind.DWord);
         }
 
+        /// <summary>
+        /// Given a process, get the partial path rule (if one exists)
+        /// </summary>
+        /// <param name="process"></param>
+        /// <returns>Partial path rule, NULL if none</returns>
         public static Priority? GetPartialRule(ProcessWithRules process)
         {
             RegistryKey partialsKey = Registry.LocalMachine.OpenSubKey(RulesBasePath.Replace(@"HKEY_LOCAL_MACHINE\", string.Empty) + @"\Partial");
@@ -231,6 +265,11 @@ namespace ProcessPriorityControl.Cmd
             return null;
         }
 
+        /// <summary>
+        /// Set a partial path rule for a given process.
+        /// </summary>
+        /// <param name="partialPath">Partial path as a string</param>
+        /// <param name="priority">Priority to set</param>
         public static void SetPartialRule(string partialPath, Priority priority)
         {
             string hash = Utility.GetMd5HashPrefixed(partialPath.ToLower());
@@ -239,6 +278,11 @@ namespace ProcessPriorityControl.Cmd
             Registry.SetValue(RulesBasePath + @"\Partial\" + hash, "Priority", priority, RegistryValueKind.DWord);
         }
 
+        /// <summary>
+        /// Given a process, get the username rule (if one exists)
+        /// </summary>
+        /// <param name="process"></param>
+        /// <returns>Username rule, NULL if none</returns>
         public static Priority? GetUsernameRule(string username)
         {
             object result = Registry.GetValue(RulesBasePath + @"\Username", username, null);
@@ -252,6 +296,11 @@ namespace ProcessPriorityControl.Cmd
             return null;
         }
 
+        /// <summary>
+        /// Set a username rule for a given process.
+        /// </summary>
+        /// <param name="process">A process</param>
+        /// <param name="priority">Priority to set</param>
         public static void SetUsernameRule(ProcessWithRules process, Priority priority)
         {
             if (process.UserSids.Count != 1)
@@ -262,16 +311,26 @@ namespace ProcessPriorityControl.Cmd
             Registry.SetValue(RulesBasePath + @"\Username", process.UserSids[0], priority, RegistryValueKind.DWord);
         }
 
+        /// <summary>
+        /// Write to the registry that changes have been made to the rules.
+        /// </summary>
         public static void SetChangesMade()
         {
             Registry.SetValue(RegistryBasePath, ChangesMade, 1, RegistryValueKind.DWord);
         }
 
+        /// <summary>
+        /// Clear the flag in the registry that indicates that changes have been made to the rules.
+        /// </summary>
         public static void ClearChangesMade()
         {
             Registry.SetValue(RegistryBasePath, ChangesMade, 0, RegistryValueKind.DWord);
         }
 
+        /// <summary>
+        /// Check the registry to determine whether or not changes have been made to the rules.
+        /// </summary>
+        /// <returns>True if changes have been made, false otherwise</returns>
         public static bool GetChangesMade()
         {
             string result = Registry.GetValue(RegistryBasePath, ChangesMade, null)?.ToString();
