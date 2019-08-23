@@ -32,7 +32,17 @@ namespace ProcessPriorityControl.Cmd
         /// <summary>
         /// Value name to track changes between background process and admin process.
         /// </summary>
-        private static readonly string ChangesMade = "ChangesMade";
+        private static readonly string ChangesMadeValueName = "ChangesMade";
+
+        /// <summary>
+        /// Value name for an optional low-power script (default operation mode).
+        /// </summary>
+        private static readonly string LowPowerScriptValueName = "LowPowerScript";
+
+        /// <summary>
+        /// Value name for an optional high-power script (for high-priority processes).
+        /// </summary>
+        private static readonly string HighPowerScriptValueName = "HighPowerScript";
 
         /// <summary>
         /// Set up the initial structure for the data stored in the registry.
@@ -316,7 +326,7 @@ namespace ProcessPriorityControl.Cmd
         /// </summary>
         public static void SetChangesMade()
         {
-            Registry.SetValue(RegistryBasePath, ChangesMade, 1, RegistryValueKind.DWord);
+            Registry.SetValue(RegistryBasePath, ChangesMadeValueName, 1, RegistryValueKind.DWord);
         }
 
         /// <summary>
@@ -324,7 +334,7 @@ namespace ProcessPriorityControl.Cmd
         /// </summary>
         public static void ClearChangesMade()
         {
-            Registry.SetValue(RegistryBasePath, ChangesMade, 0, RegistryValueKind.DWord);
+            Registry.SetValue(RegistryBasePath, ChangesMadeValueName, 0, RegistryValueKind.DWord);
         }
 
         /// <summary>
@@ -333,8 +343,29 @@ namespace ProcessPriorityControl.Cmd
         /// <returns>True if changes have been made, false otherwise</returns>
         public static bool GetChangesMade()
         {
-            string result = Registry.GetValue(RegistryBasePath, ChangesMade, null)?.ToString();
+            string result = Registry.GetValue(RegistryBasePath, ChangesMadeValueName, null)?.ToString();
             return result == "1";
         }
+
+        /// <summary>
+        /// Get the path to the low-power script, if one exists.
+        /// </summary>
+        /// <returns>Path to the low-power script; NULL if not configured</returns>
+        public static string GetLowPowerScript()
+        {
+            string result = Registry.GetValue(RegistryBasePath, LowPowerScriptValueName, null)?.ToString();
+            return result == string.Empty ? null : result;
+        }
+
+        /// <summary>
+        /// Get the path to the high-power script, if one exists.
+        /// </summary>
+        /// <returns>Path to the high-power script; NULL if not configured</returns>
+        public static string GetHighPowerScript()
+        {
+            string result = Registry.GetValue(RegistryBasePath, HighPowerScriptValueName, null)?.ToString();
+            return result == string.Empty ? null : result;
+        }
+
     }
 }

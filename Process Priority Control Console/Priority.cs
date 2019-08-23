@@ -13,6 +13,7 @@ namespace ProcessPriorityControl.Cmd
         Normal = 2,
         AboveNormal = 3,
         High = 4,
+        HighWithScript = 5,
         Ignore = -1
     }
 }

@@ -12,11 +12,40 @@ namespace ProcessPriorityControl.Cmd
     class Program
     {
         /// <summary>
-        /// Tracks active processes.
+        /// Tracks active processes; used to tell if a running process has been dealt with already.
         /// </summary>
         private static Dictionary<int, Process> activeProcesses;
 
+        /// <summary>
+        /// Tracks active processes; used to determine whether or not any processes have vanished since the last check.
+        /// </summary>
         private static HashSet<int> processTrackingHelper;
+
+        /// <summary>
+        /// Tracks processes that need the high-power script in place.
+        /// </summary>
+        private static HashSet<int> highPowerProcesses;
+
+        /// <summary>
+        /// Path to low-power script.
+        /// </summary>
+        private static string LowPowerScriptPath;
+
+        /// <summary>
+        /// Path to high-power script.
+        /// </summary>
+        private static string HighPowerScriptPath;
+
+        /// <summary>
+        /// During a refresh, used to track whether high-power mode was previously active.
+        /// </summary>
+        private static bool HighPowerModeActive;
+
+        /// <summary>
+        /// Used to determine whether or not power scripts are in use.
+        /// </summary>
+        private static bool UsingPowerScripts;
+
 
         /// <summary>
         /// Main program execution.
@@ -24,8 +53,9 @@ namespace ProcessPriorityControl.Cmd
         /// <param name="args">Command-line parameters</param>
         static void Main(string[] args)
         {
-            // Set up data structure.
+            // Set up data structures.
             activeProcesses = new Dictionary<int, Process>();
+            highPowerProcesses = new HashSet<int>();
 
             // Set up the registry structure.
             RegistryAccess.RegistrySetup();
@@ -45,6 +75,9 @@ namespace ProcessPriorityControl.Cmd
                 RegistryAccess.ClearChangesMade();
 
                 bool first = true;
+                CheckPowerScripts();
+                HighPowerModeActive = false;
+
                 while (true)
                 {
                     // Repeat... forever.
@@ -54,8 +87,10 @@ namespace ProcessPriorityControl.Cmd
                     {
                         Console.WriteLine("Changes detected from configuration mode, resetting...");
                         activeProcesses.Clear();
+                        highPowerProcesses.Clear();
                         RegistryAccess.ClearChangesMade();
                         first = true;
+                        CheckPowerScripts();
                     }
 
                     Process[] processes = Process.GetProcesses();
@@ -78,6 +113,11 @@ namespace ProcessPriorityControl.Cmd
                     {
                         Console.WriteLine("Done enumerating processes that were already running.");
                         first = false;
+
+                        if (highPowerProcesses.Count == 0)
+                        {
+                            LowPowerMode();
+                        }
                     }
 
                     // The IDs leftover in the tracking helper set are processes that have terminated.
@@ -86,6 +126,16 @@ namespace ProcessPriorityControl.Cmd
                         Process process = activeProcesses[processId];
                         Console.WriteLine("[{0}] Process ended: {1} {2}", DateTime.Now, processId, process.ProcessName);
                         activeProcesses.Remove(processId);
+
+                        if (highPowerProcesses.Contains(processId))
+                        {
+                            // This was a high-power script process.
+                            highPowerProcesses.Remove(processId);
+                            if (highPowerProcesses.Count == 0)
+                            {
+                                LowPowerMode();
+                            }
+                        }
                     }
                 }
             }
@@ -97,6 +147,7 @@ namespace ProcessPriorityControl.Cmd
         private static void ConfigurationMode()
         {
             bool changesMade = false;
+            CheckPowerScripts();
 
             // Loop through all processes that have been observed.
             foreach (ProcessWithRules process in RegistryAccess.GetObservedProcesses())
@@ -118,9 +169,17 @@ namespace ProcessPriorityControl.Cmd
                     do
                     {
                         Console.WriteLine("Which priority would you like to assign?");
-                        Console.Write("(I)dle, (B)elow normal, (N)ormal, (A)bove normal, (H)igh, (D)efault/Ignore, (S)kip > ");
+
+                        string choices = "(I)dle, (B)elow normal, (N)ormal, (A)bove normal, (H)igh, ";
+                        if (UsingPowerScripts)
+                        {
+                            choices += "High with high-(p)ower script, ";
+                        }
+                        choices += "(D)efault/Ignore, (S)kip > ";
+
+                        Console.Write(choices);
                         string input = Console.ReadLine().ToLower();
-                        if (input == "i" || input == "b" || input == "n" || input == "a" || input == "h" || input == "d" || input == "s")
+                        if (input == "i" || input == "b" || input == "n" || input == "a" || input == "h" || input == "d" || input == "s" || (UsingPowerScripts && input == "p"))
                         {
                             priorityChoice = input;
                         }
@@ -146,6 +205,9 @@ namespace ProcessPriorityControl.Cmd
                                 break;
                             case "h":
                                 priority = Priority.High;
+                                break;
+                            case "p":
+                                priority = Priority.HighWithScript;
                                 break;
                             case "d":
                                 priority = Priority.Ignore;
@@ -288,6 +350,12 @@ namespace ProcessPriorityControl.Cmd
                                 Console.WriteLine("  Priority set to high");
                                 process.PriorityClass = ProcessPriorityClass.High;
                                 break;
+                            case Priority.HighWithScript:
+                                Console.WriteLine("  Priority set to high");
+                                process.PriorityClass = ProcessPriorityClass.High;
+                                highPowerProcesses.Add(information.ProcessId);
+                                HighPowerMode();
+                                break;
                             case Priority.Ignore:
                                 Console.WriteLine("  Not setting priority for this process.");
                                 break;
@@ -302,6 +370,50 @@ namespace ProcessPriorityControl.Cmd
             catch (Exception exception)
             {
                 Console.WriteLine("  Unable to set priority: {0}", exception.Message);
+            }
+        }
+
+        /// <summary>
+        /// Check the registry and fill in information about power scripts.
+        /// </summary>
+        private static void CheckPowerScripts()
+        {
+            LowPowerScriptPath = RegistryAccess.GetLowPowerScript();
+            HighPowerScriptPath = RegistryAccess.GetHighPowerScript();
+            if (LowPowerScriptPath != null && HighPowerScriptPath != null)
+            {
+                UsingPowerScripts = true;
+                Console.WriteLine("Power scripts are configured.");
+            }
+            else
+            {
+                Console.WriteLine("Power scripts are not configured.");
+            }
+        }
+
+        /// <summary>
+        /// Run the high-power script.
+        /// </summary>
+        private static void HighPowerMode()
+        {
+            if (UsingPowerScripts && !HighPowerModeActive)
+            {
+                Console.WriteLine("  Running high-power script");
+                Process.Start(HighPowerScriptPath);
+                HighPowerModeActive = true;
+            }
+        }
+
+        /// <summary>
+        /// Run the low-power script.
+        /// </summary>
+        private static void LowPowerMode()
+        {
+            if (UsingPowerScripts && HighPowerModeActive)
+            {
+                Console.WriteLine("  Running low-power script");
+                Process.Start(LowPowerScriptPath);
+                HighPowerModeActive = false;
             }
         }
 
