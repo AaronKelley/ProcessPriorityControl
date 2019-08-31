@@ -95,12 +95,27 @@ namespace ProcessPriorityControl.Cmd
 
                     Process[] processes = Process.GetProcesses();
                     processTrackingHelper = new HashSet<int>(activeProcesses.Keys);
+
+                    // Confirm that high-power processes are still running.
+                    foreach (int processId in highPowerProcesses)
+                    {
+                        if (!processTrackingHelper.Contains(processId))
+                        {
+                            highPowerProcesses.Remove(processId);
+                            if (highPowerProcesses.Count == 0)
+                            {
+                                LowPowerMode();
+                            }
+                        }
+                    }
+
+                    // Loop through all running processes.
                     foreach (Process process in processes)
                     {
-                        if (!activeProcesses.ContainsKey(process.Id))
+                        if (!activeProcesses.ContainsKey(process.Id) || activeProcesses[process.Id].ProcessName != process.ProcessName)
                         {
                             // New process.
-                            DealWithProcess(process);
+                            ProcessStarted(process);
                         }
                         else
                         {
@@ -123,19 +138,7 @@ namespace ProcessPriorityControl.Cmd
                     // The IDs leftover in the tracking helper set are processes that have terminated.
                     foreach (int processId in processTrackingHelper)
                     {
-                        Process process = activeProcesses[processId];
-                        Console.WriteLine("[{0}] Process ended: {1} {2}", DateTime.Now, processId, process.ProcessName);
-                        activeProcesses.Remove(processId);
-
-                        if (highPowerProcesses.Contains(processId))
-                        {
-                            // This was a high-power script process.
-                            highPowerProcesses.Remove(processId);
-                            if (highPowerProcesses.Count == 0)
-                            {
-                                LowPowerMode();
-                            }
-                        }
+                        ProcessEnded(activeProcesses[processId]);
                     }
                 }
             }
@@ -259,8 +262,14 @@ namespace ProcessPriorityControl.Cmd
         /// </summary>
         /// <param name="process">A Windows process to deal with</param>
         /// <param name="parentProcessId">Optional ID of the parent process</param>
-        private static void DealWithProcess(Process process, object parentProcessId = null)
+        private static void ProcessStarted(Process process, object parentProcessId = null)
         {
+            if (activeProcesses.ContainsKey(process.Id))
+            {
+                // Somehow, a new process started with the same ID as an old one; the swap must have happened between check intervals.
+                ProcessEnded(activeProcesses[process.Id]);
+            }
+
             Console.WriteLine("[{0}] Process started: {1} {2}", DateTime.Now, process.Id, process.ProcessName);
             activeProcesses[process.Id] = process;
 
@@ -279,6 +288,26 @@ namespace ProcessPriorityControl.Cmd
         }
 
         /// <summary>
+        /// Clean-up after a process is detected as terminated.
+        /// </summary>
+        /// <param name="process">Process that has ended</param>
+        private static void ProcessEnded(Process process)
+        {
+            Console.WriteLine("[{0}] Process ended: {1} {2}", DateTime.Now, process.Id, process.ProcessName);
+            activeProcesses.Remove(process.Id);
+
+            if (highPowerProcesses.Contains(process.Id))
+            {
+                // This was a high-power script process.
+                highPowerProcesses.Remove(process.Id);
+                if (highPowerProcesses.Count == 0)
+                {
+                    LowPowerMode();
+                }
+            }
+        }
+
+        /// <summary>
         /// Deal with a process; record it, check the rules, and set the priority.
         /// </summary>
         /// <param name="processId">ID of a Windows process to deal with</param>
@@ -287,7 +316,7 @@ namespace ProcessPriorityControl.Cmd
         {
             try
             {
-                DealWithProcess(Process.GetProcessById(int.Parse(processId.ToString())));
+                ProcessStarted(Process.GetProcessById(int.Parse(processId.ToString())));
             }
             catch (Exception exception)
             {
