@@ -56,9 +56,31 @@ namespace ProcessPriorityControl.Cmd
 
             ProcessId = process.Id;
             ShortName = process.ProcessName;
-            FullPath = process.MainModule.FileName;
-            User = GetUserInformation();
-            Hash = Utility.GetMd5HashPrefixed(FullPath.ToLower());
+
+            FullPath = null;
+            Hash = null;
+            User = null;
+
+            try
+            {
+                FullPath = process.MainModule.FileName;
+                Hash = Utility.GetMd5HashPrefixed(FullPath.ToLower());
+            }
+            catch (Exception exception)
+            {
+                Console.WriteLine("  Error getting full path - {0}: {1}", process.Id, exception.Message);
+                throw exception;
+            }
+
+            try
+            {
+                User = GetUserInformation();
+            }
+            catch (Exception exception)
+            {
+                Console.WriteLine("  Error getting user information - {0}: {1}", process.Id, exception.Message);
+                throw exception;
+            }
         }
 
         public void RecordProcessInformation()
