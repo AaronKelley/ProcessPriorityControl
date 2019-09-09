@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Diagnostics;
 using System.Management;
 using System.Threading;
@@ -283,7 +284,14 @@ namespace ProcessPriorityControl.Cmd
             }
             catch (Exception exception)
             {
-                Console.WriteLine("  Unable to handle process {0}: {1}", process.Id, exception.Message);
+                Console.WriteLine("  [{0}] Unable to handle process {1}: {2}", exception.GetType().ToString(), process.Id, exception.Message);
+
+                if (exception is Win32Exception && exception.Message == "Only part of a ReadProcessMemory or WriteProcessMemory request was completed")
+                {
+                    // Sometimes this exception happens when a 32-bit process has just started, or a process quickly starts and then terminates.
+                    // Set up to try again on the next iteration.
+                    activeProcesses.Remove(process.Id);
+                }
             }
         }
 
@@ -304,23 +312,6 @@ namespace ProcessPriorityControl.Cmd
                 {
                     LowPowerMode();
                 }
-            }
-        }
-
-        /// <summary>
-        /// Deal with a process; record it, check the rules, and set the priority.
-        /// </summary>
-        /// <param name="processId">ID of a Windows process to deal with</param>
-        /// <param name="parentProcessId">ID of the parent process</param>
-        private static void DealWithProcess(object processId, object parentProcessId)
-        {
-            try
-            {
-                ProcessStarted(Process.GetProcessById(int.Parse(processId.ToString())));
-            }
-            catch (Exception exception)
-            {
-                Console.WriteLine("  Unable to handle process {0}: {1}", processId.ToString(), exception.Message);
             }
         }
 
@@ -444,55 +435,6 @@ namespace ProcessPriorityControl.Cmd
                 Process.Start(LowPowerScriptPath);
                 HighPowerModeActive = false;
             }
-        }
-
-        /// <summary>
-        /// Start listening for process start and stop events.
-        /// </summary>
-        /// <seealso cref="https://stackoverflow.com/questions/967646/monitor-when-an-exe-is-launched/967668#967668"/>
-        private static void ListenForProcesses()
-        {
-            ManagementEventWatcher processStartWatcher = new ManagementEventWatcher(new WqlEventQuery("SELECT * FROM Win32_ProcessStartTrace"));
-            ManagementEventWatcher processStopWatcher = new ManagementEventWatcher(new WqlEventQuery("SELECT * FROM Win32_ProcessStopTrace"));
-
-            processStartWatcher.EventArrived += new EventArrivedEventHandler(ProcessStartedEventHandler);
-            processStopWatcher.EventArrived += new EventArrivedEventHandler(ProcessStoppedEventHandler);
-
-            processStartWatcher.Start();
-            processStopWatcher.Start();
-        }
-
-        /// <summary>
-        /// Event handler fired when a new process is started.
-        /// </summary>
-        /// <param name="sender">Event originator</param>
-        /// <param name="arguments">Event information</param>
-        public static void ProcessStartedEventHandler(object sender, EventArrivedEventArgs arguments)
-        {
-            Console.WriteLine("Process started: {0} {1}", arguments.NewEvent.Properties["ProcessID"].Value, arguments.NewEvent.Properties["ProcessName"].Value);
-            DealWithProcess(arguments.NewEvent.Properties["ProcessID"].Value, arguments.NewEvent.Properties["ParentProcessID"].Value);
-
-            /*
-             * Available properties:
-             *
-             * ParentProcessID
-             * ProcessID
-             * ProcessName
-             * SessionID
-             * Sid (bytes)
-             * TIME_CREATED
-             * SECURITY_DESCRIPTOR
-             */
-        }
-
-        /// <summary>
-        /// Event handler fired when a process terminates.
-        /// </summary>
-        /// <param name="sender">Event originator</param>
-        /// <param name="arguments">Event information</param>
-        public static void ProcessStoppedEventHandler(object sender, EventArrivedEventArgs arguments)
-        {
-            Console.WriteLine("Process stopped: {0} {1}", arguments.NewEvent.Properties["ProcessID"].Value, arguments.NewEvent.Properties["ProcessName"].Value);
         }
     }
 }
