@@ -14,6 +14,7 @@ namespace ProcessPriorityControl.Cmd
         AboveNormal = 3,
         High = 4,
         HighWithScript = 5,
-        Ignore = -1
+        Ignore = -1,
+        ConditionalIdle = -2
     }
 }

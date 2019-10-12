@@ -28,6 +28,11 @@ namespace ProcessPriorityControl.Cmd
         private static HashSet<int> highPowerProcesses;
 
         /// <summary>
+        /// Tracks processes that are in the "conditional idle" set.
+        /// </summary>
+        private static HashSet<int> conditionalIdleProcesses;
+
+        /// <summary>
         /// Path to low-power script.
         /// </summary>
         private static string LowPowerScriptPath;
@@ -57,6 +62,7 @@ namespace ProcessPriorityControl.Cmd
             // Set up data structures.
             activeProcesses = new Dictionary<int, Process>();
             highPowerProcesses = new HashSet<int>();
+            conditionalIdleProcesses = new HashSet<int>();
 
             // Set up the registry structure.
             RegistryAccess.RegistrySetup();
@@ -89,6 +95,7 @@ namespace ProcessPriorityControl.Cmd
                         Console.WriteLine("Changes detected from configuration mode, resetting...");
                         activeProcesses.Clear();
                         highPowerProcesses.Clear();
+                        conditionalIdleProcesses.Clear();
                         RegistryAccess.ClearChangesMade();
                         first = true;
                         CheckPowerScripts();
@@ -122,6 +129,23 @@ namespace ProcessPriorityControl.Cmd
                         {
                             // Existing process.
                             processTrackingHelper.Remove(process.Id);
+
+                            // Conditional idle priority.  Set idle only if priority is normal.
+                            try
+                            {
+                                if (conditionalIdleProcesses.Contains(process.Id))
+                                {
+                                    if (process.PriorityClass == ProcessPriorityClass.Normal)
+                                    {
+                                        Console.WriteLine("  Resetting priority for process {0} to idle", process.Id);
+                                        process.PriorityClass = ProcessPriorityClass.Idle;
+                                    }
+                                }
+                            }
+                            catch (Exception exception)
+                            {
+                                Console.WriteLine("  Unable to handle conditional idle priority: {0}", exception.Message);
+                            }
                         }
                     }
 
@@ -313,6 +337,11 @@ namespace ProcessPriorityControl.Cmd
                     LowPowerMode();
                 }
             }
+
+            if (conditionalIdleProcesses.Contains(process.Id))
+            {
+                conditionalIdleProcesses.Remove(process.Id);
+            }
         }
 
         /// <summary>
@@ -353,6 +382,14 @@ namespace ProcessPriorityControl.Cmd
                             case Priority.Idle:
                                 Console.WriteLine("  Priority set to idle");
                                 process.PriorityClass = ProcessPriorityClass.Idle;
+                                break;
+                            case Priority.ConditionalIdle:
+                                Console.WriteLine("  Priority set to conditional idle - idle only if it is already normal");
+                                conditionalIdleProcesses.Add(information.ProcessId);
+                                if (process.PriorityClass == ProcessPriorityClass.Normal)
+                                {
+                                    process.PriorityClass = ProcessPriorityClass.Idle;
+                                }
                                 break;
                             case Priority.BelowNormal:
                                 Console.WriteLine("  Priority set to below normal");
