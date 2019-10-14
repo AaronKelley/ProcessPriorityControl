@@ -305,6 +305,7 @@ namespace ProcessPriorityControl.Cmd
                 PrintProcessInformation(information);
                 information.RecordProcessInformation();
                 AssignProcessPriority(information);
+                RunLaunchScript(information);
             }
             catch (Exception exception)
             {
@@ -427,6 +428,37 @@ namespace ProcessPriorityControl.Cmd
             catch (Exception exception)
             {
                 Console.WriteLine("  Unable to set priority: {0}", exception.Message);
+            }
+        }
+
+        private static void RunLaunchScript(ProcessInformation information)
+        {
+            try
+            {
+                string launchScript = RegistryAccess.GetLaunchScript(information);
+                if (launchScript != null)
+                {
+                    string[] launchScriptPieces = launchScript.Split(new char[] { ' ' });
+                    if (launchScriptPieces.Length == 1)
+                    {
+                        Console.WriteLine("  Running launch script.");
+                        Console.WriteLine("    Process path: {0}", launchScript);
+                        Process.Start(launchScript);
+                    }
+                    else if (launchScriptPieces.Length > 1)
+                    {
+                        string arguments = launchScript.Substring(launchScriptPieces[0].Length + 1);
+
+                        Console.WriteLine("  Running launch script.");
+                        Console.WriteLine("    Process path: {0}", launchScriptPieces[0]);
+                        Console.WriteLine("    Arguments:    {0}", arguments);
+                        Process.Start(launchScriptPieces[0], arguments);
+                    }
+                }
+            }
+            catch (Exception exception)
+            {
+                Console.WriteLine("  Error running launch script: {0}", exception.Message);
             }
         }
 

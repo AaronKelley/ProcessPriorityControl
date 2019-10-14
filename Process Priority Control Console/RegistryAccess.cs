@@ -30,6 +30,11 @@ namespace ProcessPriorityControl.Cmd
         private static readonly string RulesBasePath = RegistryBasePath + @"\Rules";
 
         /// <summary>
+        /// Base path for launch scripts.
+        /// </summary>
+        private static readonly string LaunchScriptsPath = RegistryBasePath + @"\Launch scripts";
+
+        /// <summary>
         /// Value name to track changes between background process and admin process.
         /// </summary>
         private static readonly string ChangesMadeValueName = "ChangesMade";
@@ -56,6 +61,7 @@ namespace ProcessPriorityControl.Cmd
             Registry.SetValue(UserInformationBasePath, string.Empty, string.Empty);
             Registry.SetValue(ProcessInformationBasePath, string.Empty, string.Empty);
             Registry.SetValue(RulesBasePath, string.Empty, string.Empty);
+            Registry.SetValue(LaunchScriptsPath, string.Empty, string.Empty);
 
             Registry.SetValue(RulesBasePath + @"\Full path", string.Empty, string.Empty);
             Registry.SetValue(RulesBasePath + @"\Short name", string.Empty, string.Empty);
@@ -367,5 +373,15 @@ namespace ProcessPriorityControl.Cmd
             return result == string.Empty ? null : result;
         }
 
+        /// <summary>
+        /// Get the launch script for a process, if one exists.
+        /// </summary>
+        /// <param name="information">Information about the process</param>
+        /// <returns>Launch script; NULL if none</returns>
+        public static string GetLaunchScript(ProcessInformation information)
+        {
+            string result = Registry.GetValue(LaunchScriptsPath, information.Hash, null)?.ToString();
+            return result == string.Empty ? null : result;
+        }
     }
 }
