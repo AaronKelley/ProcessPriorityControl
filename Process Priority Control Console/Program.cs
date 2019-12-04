@@ -2,7 +2,6 @@
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
-using System.Management;
 using System.Threading;
 
 namespace ProcessPriorityControl.Cmd
