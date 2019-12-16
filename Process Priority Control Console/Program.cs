@@ -310,10 +310,11 @@ namespace ProcessPriorityControl.Cmd
             {
                 Console.WriteLine("  [{0}] Unable to handle process {1}: {2}", exception.GetType().ToString(), process.Id, exception.Message);
 
-                if (exception is Win32Exception && exception.Message == "Only part of a ReadProcessMemory or WriteProcessMemory request was completed")
+                if (exception is Win32Exception && exception.Message.Contains("Only part of a ReadProcessMemory or WriteProcessMemory request was completed"))
                 {
-                    // Sometimes this exception happens when a 32-bit process has just started, or a process quickly starts and then terminates.
+                    // Sometimes this exception happens when a process has just started, or a process quickly starts and then terminates.
                     // Set up to try again on the next iteration.
+                    Console.WriteLine("  Will retry process {1}", process.Id);
                     activeProcesses.Remove(process.Id);
                 }
             }
