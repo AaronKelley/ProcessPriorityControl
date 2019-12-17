@@ -310,7 +310,7 @@ namespace ProcessPriorityControl.Cmd
             {
                 Console.WriteLine("  [{0}] Unable to handle process {1}: {2}", exception.GetType().ToString(), process.Id, exception.Message);
 
-                if (exception is Win32Exception && exception.Message.Contains("Only part of a ReadProcessMemory or WriteProcessMemory request was completed"))
+                if (exception.Message.Contains("Only part of a ReadProcessMemory or WriteProcessMemory request was completed") || exception.Message.Contains("Object reference not set to an instance of an object"))
                 {
                     // Sometimes this exception happens when a process has just started, or a process quickly starts and then terminates.
                     // Set up to try again on the next iteration.
