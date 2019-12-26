@@ -192,54 +192,11 @@ namespace ProcessPriorityControl.Cmd
                 {
                     Console.WriteLine("No priority determined for this process.");
 
-                    string priorityChoice = null;
-                    do
-                    {
-                        Console.WriteLine("Which priority would you like to assign?");
+                    priority = PriorityPrompt();
 
-                        string choices = "(I)dle, (B)elow normal, (N)ormal, (A)bove normal, (H)igh, ";
-                        if (UsingPowerScripts)
-                        {
-                            choices += "High with high-(p)ower script, ";
-                        }
-                        choices += "(D)efault/Ignore, (S)kip > ";
-
-                        Console.Write(choices);
-                        string input = Console.ReadLine().ToLower();
-                        if (input == "i" || input == "b" || input == "n" || input == "a" || input == "h" || input == "d" || input == "s" || (UsingPowerScripts && input == "p"))
-                        {
-                            priorityChoice = input;
-                        }
-                    } while (priorityChoice == null);
-
-                    if (priorityChoice != "s")
+                    if (priority != null)
                     {
                         changesMade = true;
-
-                        switch (priorityChoice)
-                        {
-                            case "i":
-                                priority = Priority.Idle;
-                                break;
-                            case "b":
-                                priority = Priority.BelowNormal;
-                                break;
-                            case "n":
-                                priority = Priority.Normal;
-                                break;
-                            case "a":
-                                priority = Priority.AboveNormal;
-                                break;
-                            case "h":
-                                priority = Priority.High;
-                                break;
-                            case "p":
-                                priority = Priority.HighWithScript;
-                                break;
-                            case "d":
-                                priority = Priority.Ignore;
-                                break;
-                        }
 
                         string prioritySpecify = null;
                         do
@@ -275,10 +232,95 @@ namespace ProcessPriorityControl.Cmd
                 Console.WriteLine();
             }
 
+            // Loop through all services that have been observed.
+            Console.WriteLine("Checking services...");
+            foreach (string serviceName in RegistryAccess.GetObservedServiceNames())
+            {
+                Console.WriteLine("  {0}", serviceName);
+
+                Priority? priority = RegistryAccess.GetPriorityForService(serviceName);
+                if (priority == null)
+                {
+                    Console.WriteLine();
+                    Console.WriteLine("Need to set priority for service \"{0}\"", serviceName);
+
+                    Priority? servicePriority = PriorityPrompt(false);
+
+                    if (servicePriority != null)
+                    {
+                        changesMade = true;
+                        RegistryAccess.SetPriorityForService(serviceName, (Priority)servicePriority);
+                    }
+
+                    Console.WriteLine();
+                }
+            }
+
             if (changesMade)
             {
                 RegistryAccess.SetChangesMade();
             }
+        }
+
+        /// <summary>
+        /// Prompts the user for the priority and returns what was selected.
+        /// </summary>
+        /// <param name="allowPowerScripts">If false, power scripts will not be allowed</param>
+        /// <returns>Selected priority; NULL if none</returns>
+        private static Priority? PriorityPrompt(bool allowPowerScripts = true)
+        {
+            bool includePowerScriptChoice = UsingPowerScripts && allowPowerScripts;
+            Priority? priority = null;
+
+            string priorityChoice = null;
+            do
+            {
+                Console.WriteLine("Which priority would you like to assign?");
+
+                string choices = "(I)dle, (B)elow normal, (N)ormal, (A)bove normal, (H)igh, ";
+                if (includePowerScriptChoice)
+                {
+                    choices += "High with high-(p)ower script, ";
+                }
+                choices += "(D)efault/Ignore, (S)kip > ";
+
+                Console.Write(choices);
+                string input = Console.ReadLine().ToLower();
+                if (input == "i" || input == "b" || input == "n" || input == "a" || input == "h" || input == "d" || input == "s" || (includePowerScriptChoice && input == "p"))
+                {
+                    priorityChoice = input;
+                }
+            } while (priorityChoice == null);
+
+            if (priorityChoice != "s")
+            {
+                switch (priorityChoice)
+                {
+                    case "i":
+                        priority = Priority.Idle;
+                        break;
+                    case "b":
+                        priority = Priority.BelowNormal;
+                        break;
+                    case "n":
+                        priority = Priority.Normal;
+                        break;
+                    case "a":
+                        priority = Priority.AboveNormal;
+                        break;
+                    case "h":
+                        priority = Priority.High;
+                        break;
+                    case "p":
+                        priority = Priority.HighWithScript;
+                        break;
+                    case "d":
+                        priority = Priority.Ignore;
+                        break;
+                }
+            }
+
+            return priority;
         }
 
         /// <summary>
@@ -355,6 +397,16 @@ namespace ProcessPriorityControl.Cmd
             {
                 Console.WriteLine("  {0}", information.FullPath);
                 Console.WriteLine(@"  {0}: {1}\{2}", information.User?.Sid, information.User?.Domain, information.User?.Username);
+
+                if (information.ServiceNames != null)
+                {
+                    Console.Write("  Services:");
+                    foreach (string serviceName in information.ServiceNames)
+                    {
+                        Console.Write(" {0}", serviceName);
+                    }
+                    Console.WriteLine();
+                }
             }
             catch (Exception exception)
             {
@@ -372,6 +424,20 @@ namespace ProcessPriorityControl.Cmd
             {
                 ProcessWithRules processWithRules = information.GetRulesObject();
                 Priority? priority = processWithRules.GetPriority();
+
+                if (information.ServiceNames != null)
+                {
+                    // Service priority can override process priority.  We will take the highest priority specified.
+                    foreach (string serviceName in information.ServiceNames)
+                    {
+                        Priority? servicePriority = RegistryAccess.GetPriorityForService(serviceName);
+                        if (servicePriority != null && servicePriority > priority)
+                        {
+                            Console.WriteLine("  !! Service priority override");
+                            priority = (Priority)servicePriority;
+                        }
+                    }
+                }
 
                 if (priority != null)
                 {

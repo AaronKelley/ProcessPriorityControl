@@ -45,6 +45,11 @@ namespace ProcessPriorityControl.Cmd
         public string Hash { get; }
 
         /// <summary>
+        /// List of names of services hosted by this process.
+        /// </summary>
+        public List<string> ServiceNames { get; }
+
+        /// <summary>
         /// Constructor.
         /// </summary>
         /// <param name="process">A Windows process to collect information for</param>
@@ -79,6 +84,23 @@ namespace ProcessPriorityControl.Cmd
             catch (Exception exception)
             {
                 Console.WriteLine("  Error getting user information - {0}: {1}", process.Id, exception.Message);
+                throw exception;
+            }
+
+            try
+            {
+                if (process.IsServiceProcessCandidate())
+                {
+                    ServiceNames = process.ServiceNames();
+                }
+                else
+                {
+                    ServiceNames = null;
+                }
+            }
+            catch (Exception exception)
+            {
+                Console.WriteLine("  Error getting service information - {0}: {1}", process.Id, exception.Message);
                 throw exception;
             }
         }

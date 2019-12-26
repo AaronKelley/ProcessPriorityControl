@@ -1,5 +1,7 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Diagnostics;
+using System.Management;
 using System.Runtime.InteropServices;
 
 namespace ProcessPriorityControl.Cmd
@@ -65,6 +67,37 @@ namespace ProcessPriorityControl.Cmd
             }
 
             return userSid;
+        }
+
+        /// <summary>
+        /// Determine whether it is likely that this process is hosting Windows services.
+        /// </summary>
+        /// <param name="process">A Windows process</param>
+        /// <returns>True if this is likely a service host process, false otherwise</returns>
+        public static bool IsServiceProcessCandidate(this Process process)
+        {
+            // Maybe expand on this later.
+            return process.ProcessName == "svchost";
+        }
+
+        /// <summary>
+        /// Get a list of names of services hosted by this process.
+        /// </summary>
+        /// <param name="process">A Windows process</param>
+        /// <returns>List of names of services that this process is running</returns>
+        /// <seealso cref="https://stackoverflow.com/questions/23084720/get-the-pid-of-a-windows-service"/>
+        /// <seealso cref="https://stackoverflow.com/questions/565658/finding-out-windows-services-running-process-name-net-1-1/569288#569288"/>
+        public static List<string> ServiceNames(this Process process)
+        {
+            ManagementObjectSearcher searcher = new ManagementObjectSearcher("SELECT Name FROM Win32_Service WHERE ProcessId = " + process.Id);
+            List<string> serviceNames = new List<string>();
+
+            foreach (ManagementObject result in searcher.Get())
+            {
+                serviceNames.Add(result["Name"].ToString());
+            }
+
+            return serviceNames;
         }
 
         /// <summary>
