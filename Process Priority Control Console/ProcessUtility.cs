@@ -94,7 +94,13 @@ namespace ProcessPriorityControl.Cmd
 
             foreach (ManagementObject result in searcher.Get())
             {
-                serviceNames.Add(result["Name"].ToString());
+                string serviceName = result["Name"].ToString();
+                if (serviceName.Contains("_"))
+                {
+                    serviceName = serviceName.Substring(0, serviceName.IndexOf("_") + 1);
+                }
+
+                serviceNames.Add(serviceName);
             }
 
             return serviceNames;
