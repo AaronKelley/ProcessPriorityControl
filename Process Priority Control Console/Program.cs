@@ -524,7 +524,7 @@ namespace ProcessPriorityControl.Cmd
             }
             catch (Exception exception)
             {
-                Console.WriteLine("  Error running launch script: {0}", exception.Message);
+                Console.WriteLine("  Error running launch script: [{0}] {1}", exception.GetType().ToString(), exception.Message);
             }
         }
 
