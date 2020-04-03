@@ -493,10 +493,14 @@ namespace ProcessPriorityControl.Cmd
             }
             catch (Exception exception)
             {
-                Console.WriteLine("  Unable to set priority: {0}", exception.Message);
+                Console.WriteLine("  Unable to set priority: [{0}] {1}", exception.GetType().ToString(), exception.Message);
             }
         }
 
+        /// <summary>
+        /// Fire a script set to run when a specific program starts.
+        /// </summary>
+        /// <param name="information">Process to fire a script for.</param>
         private static void RunLaunchScript(ProcessInformation information)
         {
             try
@@ -509,7 +513,7 @@ namespace ProcessPriorityControl.Cmd
                     {
                         Console.WriteLine("  Running launch script.");
                         Console.WriteLine("    Process path: {0}", launchScript);
-                        Process.Start(launchScript);
+                        RunScript(launchScript);
                     }
                     else if (launchScriptPieces.Length > 1)
                     {
@@ -518,7 +522,7 @@ namespace ProcessPriorityControl.Cmd
                         Console.WriteLine("  Running launch script.");
                         Console.WriteLine("    Process path: {0}", launchScriptPieces[0]);
                         Console.WriteLine("    Arguments:    {0}", arguments);
-                        Process.Start(launchScriptPieces[0], arguments);
+                        RunScript(launchScriptPieces[0], arguments);
                     }
                 }
             }
@@ -553,9 +557,16 @@ namespace ProcessPriorityControl.Cmd
         {
             if (UsingPowerScripts && !HighPowerModeActive)
             {
-                Console.WriteLine("  Running high-power script");
-                Process.Start(HighPowerScriptPath);
-                HighPowerModeActive = true;
+                try
+                {
+                    Console.WriteLine("  Running high-power script");
+                    RunScript(HighPowerScriptPath);
+                    HighPowerModeActive = true;
+                }
+                catch (Exception exception)
+                {
+                    Console.WriteLine("  Error running high-power script: [{0}] {1}", exception.GetType().ToString(), exception.Message);
+                }
             }
         }
 
@@ -566,9 +577,39 @@ namespace ProcessPriorityControl.Cmd
         {
             if (UsingPowerScripts && HighPowerModeActive)
             {
-                Console.WriteLine("  Running low-power script");
-                Process.Start(LowPowerScriptPath);
-                HighPowerModeActive = false;
+                try
+                {
+                    Console.WriteLine("  Running low-power script");
+                    RunScript(LowPowerScriptPath);
+                    HighPowerModeActive = false;
+                }
+                catch (Exception exception)
+                {
+                    Console.WriteLine("  Error running high-power script: [{0}] {1}", exception.GetType().ToString(), exception.Message);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Run a script.  Adjust for running batch scripts.
+        /// </summary>
+        /// <param name="executablePath">Path to script to run</param>
+        /// <param name="arguments">Extra arguments to pass along</param>
+        private static void RunScript(string executablePath, string arguments = null)
+        {
+            if (executablePath.EndsWith(".bat"))
+            {
+                arguments = "/c " + executablePath + " " + arguments;
+                executablePath = @"C:\Windows\system32\cmd.exe";
+            }
+
+            if (arguments != null)
+            {
+                Process.Start(executablePath, arguments);
+            }
+            else
+            {
+                Process.Start(executablePath);
             }
         }
     }
