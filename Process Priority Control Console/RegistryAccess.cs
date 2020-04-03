@@ -25,6 +25,11 @@ namespace ProcessPriorityControl.Cmd
         private static readonly string ProcessInformationBasePath = RegistryBasePath + @"\Processes";
 
         /// <summary>
+        /// Base path for service information.
+        /// </summary>
+        private static readonly string ServiceInformationBasePath = RegistryBasePath + @"\Services";
+
+        /// <summary>
         /// Base path for rules.
         /// </summary>
         private static readonly string RulesBasePath = RegistryBasePath + @"\Rules";
@@ -60,6 +65,7 @@ namespace ProcessPriorityControl.Cmd
             // Create main subkeys.
             Registry.SetValue(UserInformationBasePath, string.Empty, string.Empty);
             Registry.SetValue(ProcessInformationBasePath, string.Empty, string.Empty);
+            Registry.SetValue(ServiceInformationBasePath, string.Empty, string.Empty);
             Registry.SetValue(RulesBasePath, string.Empty, string.Empty);
             Registry.SetValue(LaunchScriptsPath, string.Empty, string.Empty);
 
@@ -67,6 +73,7 @@ namespace ProcessPriorityControl.Cmd
             Registry.SetValue(RulesBasePath + @"\Short name", string.Empty, string.Empty);
             Registry.SetValue(RulesBasePath + @"\Partial", string.Empty, string.Empty);
             Registry.SetValue(RulesBasePath + @"\Username", string.Empty, string.Empty);
+            Registry.SetValue(RulesBasePath + @"\Services", string.Empty, string.Empty);
         }
 
         /// <summary>
@@ -91,6 +98,22 @@ namespace ProcessPriorityControl.Cmd
             if (information.ShortName != string.Empty)
             {
                 Registry.SetValue(basePath, "Name", information.ShortName, RegistryValueKind.String);
+            }
+
+            // Service information.
+            if (information.ServiceNames != null)
+            {
+                foreach (string serviceName in information.ServiceNames)
+                {
+                    // Base path for this service.
+                    string serviceBasePath = ServiceInformationBasePath + @"\" + serviceName;
+
+                    // Create key for this service.
+                    Registry.SetValue(serviceBasePath, string.Empty, information.FullPath, RegistryValueKind.String);
+
+                    // Store the last time that this particular service was observed.
+                    Registry.SetValue(serviceBasePath, "Timestamp", DateTimeOffset.UtcNow.ToUnixTimeSeconds(), RegistryValueKind.QWord);
+                }
             }
 
             // Record user information as well.
@@ -197,6 +220,19 @@ namespace ProcessPriorityControl.Cmd
             }
 
             return processes;
+        }
+
+        public static List<string> GetObservedServiceNames()
+        {
+            List<string> serviceNames = new List<string>();
+
+            RegistryKey servicesKey = Registry.LocalMachine.OpenSubKey(ServiceInformationBasePath.Replace(@"HKEY_LOCAL_MACHINE\", string.Empty));
+            foreach (string serviceName in servicesKey.GetSubKeyNames())
+            {
+                serviceNames.Add(serviceName);
+            }
+
+            return serviceNames;
         }
 
         /// <summary>
@@ -382,6 +418,34 @@ namespace ProcessPriorityControl.Cmd
         {
             string result = Registry.GetValue(LaunchScriptsPath, information.Hash, null)?.ToString();
             return result == string.Empty ? null : result;
+        }
+
+        /// <summary>
+        /// Get the priority set for a service, if one exists.
+        /// </summary>
+        /// <param name="serviceName">Service name</param>
+        /// <returns>Priority that has been set; NULL if none</returns>
+        public static Priority? GetPriorityForService(string serviceName)
+        {
+            string result = Registry.GetValue(RulesBasePath + @"\Services", serviceName, null)?.ToString();
+            if (result == string.Empty || result == null)
+            {
+                return null;
+            }
+            else
+            {
+                return (Priority)int.Parse(result);
+            }
+        }
+
+        /// <summary>
+        /// Set the priority for a service.
+        /// </summary>
+        /// <param name="serviceName">Service name</param>
+        /// <param name="priority">Priority to set</param>
+        public static void SetPriorityForService(string serviceName, Priority priority)
+        {
+            Registry.SetValue(RulesBasePath + @"\Services", serviceName, priority, RegistryValueKind.DWord);
         }
     }
 }

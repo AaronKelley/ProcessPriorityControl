@@ -1,8 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.ComponentModel;
 using System.Diagnostics;
-using System.Management;
 using System.Threading;
 
 namespace ProcessPriorityControl.Cmd
@@ -193,54 +191,11 @@ namespace ProcessPriorityControl.Cmd
                 {
                     Console.WriteLine("No priority determined for this process.");
 
-                    string priorityChoice = null;
-                    do
-                    {
-                        Console.WriteLine("Which priority would you like to assign?");
+                    priority = PriorityPrompt();
 
-                        string choices = "(I)dle, (B)elow normal, (N)ormal, (A)bove normal, (H)igh, ";
-                        if (UsingPowerScripts)
-                        {
-                            choices += "High with high-(p)ower script, ";
-                        }
-                        choices += "(D)efault/Ignore, (S)kip > ";
-
-                        Console.Write(choices);
-                        string input = Console.ReadLine().ToLower();
-                        if (input == "i" || input == "b" || input == "n" || input == "a" || input == "h" || input == "d" || input == "s" || (UsingPowerScripts && input == "p"))
-                        {
-                            priorityChoice = input;
-                        }
-                    } while (priorityChoice == null);
-
-                    if (priorityChoice != "s")
+                    if (priority != null)
                     {
                         changesMade = true;
-
-                        switch (priorityChoice)
-                        {
-                            case "i":
-                                priority = Priority.Idle;
-                                break;
-                            case "b":
-                                priority = Priority.BelowNormal;
-                                break;
-                            case "n":
-                                priority = Priority.Normal;
-                                break;
-                            case "a":
-                                priority = Priority.AboveNormal;
-                                break;
-                            case "h":
-                                priority = Priority.High;
-                                break;
-                            case "p":
-                                priority = Priority.HighWithScript;
-                                break;
-                            case "d":
-                                priority = Priority.Ignore;
-                                break;
-                        }
 
                         string prioritySpecify = null;
                         do
@@ -276,10 +231,95 @@ namespace ProcessPriorityControl.Cmd
                 Console.WriteLine();
             }
 
+            // Loop through all services that have been observed.
+            Console.WriteLine("Checking services...");
+            foreach (string serviceName in RegistryAccess.GetObservedServiceNames())
+            {
+                Console.WriteLine("  {0}", serviceName);
+
+                Priority? priority = RegistryAccess.GetPriorityForService(serviceName);
+                if (priority == null)
+                {
+                    Console.WriteLine();
+                    Console.WriteLine("Need to set priority for service \"{0}\"", serviceName);
+
+                    Priority? servicePriority = PriorityPrompt(false);
+
+                    if (servicePriority != null)
+                    {
+                        changesMade = true;
+                        RegistryAccess.SetPriorityForService(serviceName, (Priority)servicePriority);
+                    }
+
+                    Console.WriteLine();
+                }
+            }
+
             if (changesMade)
             {
                 RegistryAccess.SetChangesMade();
             }
+        }
+
+        /// <summary>
+        /// Prompts the user for the priority and returns what was selected.
+        /// </summary>
+        /// <param name="allowPowerScripts">If false, power scripts will not be allowed</param>
+        /// <returns>Selected priority; NULL if none</returns>
+        private static Priority? PriorityPrompt(bool allowPowerScripts = true)
+        {
+            bool includePowerScriptChoice = UsingPowerScripts && allowPowerScripts;
+            Priority? priority = null;
+
+            string priorityChoice = null;
+            do
+            {
+                Console.WriteLine("Which priority would you like to assign?");
+
+                string choices = "(I)dle, (B)elow normal, (N)ormal, (A)bove normal, (H)igh, ";
+                if (includePowerScriptChoice)
+                {
+                    choices += "High with high-(p)ower script, ";
+                }
+                choices += "(D)efault/Ignore, (S)kip > ";
+
+                Console.Write(choices);
+                string input = Console.ReadLine().ToLower();
+                if (input == "i" || input == "b" || input == "n" || input == "a" || input == "h" || input == "d" || input == "s" || (includePowerScriptChoice && input == "p"))
+                {
+                    priorityChoice = input;
+                }
+            } while (priorityChoice == null);
+
+            if (priorityChoice != "s")
+            {
+                switch (priorityChoice)
+                {
+                    case "i":
+                        priority = Priority.Idle;
+                        break;
+                    case "b":
+                        priority = Priority.BelowNormal;
+                        break;
+                    case "n":
+                        priority = Priority.Normal;
+                        break;
+                    case "a":
+                        priority = Priority.AboveNormal;
+                        break;
+                    case "h":
+                        priority = Priority.High;
+                        break;
+                    case "p":
+                        priority = Priority.HighWithScript;
+                        break;
+                    case "d":
+                        priority = Priority.Ignore;
+                        break;
+                }
+            }
+
+            return priority;
         }
 
         /// <summary>
@@ -311,10 +351,11 @@ namespace ProcessPriorityControl.Cmd
             {
                 Console.WriteLine("  [{0}] Unable to handle process {1}: {2}", exception.GetType().ToString(), process.Id, exception.Message);
 
-                if (exception is Win32Exception && exception.Message == "Only part of a ReadProcessMemory or WriteProcessMemory request was completed")
+                if (exception.Message.Contains("Only part of a ReadProcessMemory or WriteProcessMemory request was completed") || exception.Message.Contains("Object reference not set to an instance of an object"))
                 {
-                    // Sometimes this exception happens when a 32-bit process has just started, or a process quickly starts and then terminates.
+                    // Sometimes this exception happens when a process has just started, or a process quickly starts and then terminates.
                     // Set up to try again on the next iteration.
+                    Console.WriteLine("  Will retry process {0}", process.Id);
                     activeProcesses.Remove(process.Id);
                 }
             }
@@ -355,6 +396,16 @@ namespace ProcessPriorityControl.Cmd
             {
                 Console.WriteLine("  {0}", information.FullPath);
                 Console.WriteLine(@"  {0}: {1}\{2}", information.User?.Sid, information.User?.Domain, information.User?.Username);
+
+                if (information.ServiceNames != null)
+                {
+                    Console.Write("  Services:");
+                    foreach (string serviceName in information.ServiceNames)
+                    {
+                        Console.Write(" {0}", serviceName);
+                    }
+                    Console.WriteLine();
+                }
             }
             catch (Exception exception)
             {
@@ -372,6 +423,20 @@ namespace ProcessPriorityControl.Cmd
             {
                 ProcessWithRules processWithRules = information.GetRulesObject();
                 Priority? priority = processWithRules.GetPriority();
+
+                if (information.ServiceNames != null)
+                {
+                    // Service priority can override process priority.  We will take the highest priority specified.
+                    foreach (string serviceName in information.ServiceNames)
+                    {
+                        Priority? servicePriority = RegistryAccess.GetPriorityForService(serviceName);
+                        if (servicePriority != null && servicePriority > priority)
+                        {
+                            Console.WriteLine("  !! Service priority override");
+                            priority = (Priority)servicePriority;
+                        }
+                    }
+                }
 
                 if (priority != null)
                 {
@@ -427,10 +492,14 @@ namespace ProcessPriorityControl.Cmd
             }
             catch (Exception exception)
             {
-                Console.WriteLine("  Unable to set priority: {0}", exception.Message);
+                Console.WriteLine("  Unable to set priority: [{0}] {1}", exception.GetType().ToString(), exception.Message);
             }
         }
 
+        /// <summary>
+        /// Fire a script set to run when a specific program starts.
+        /// </summary>
+        /// <param name="information">Process to fire a script for.</param>
         private static void RunLaunchScript(ProcessInformation information)
         {
             try
@@ -443,7 +512,7 @@ namespace ProcessPriorityControl.Cmd
                     {
                         Console.WriteLine("  Running launch script.");
                         Console.WriteLine("    Process path: {0}", launchScript);
-                        Process.Start(launchScript);
+                        RunScript(launchScript);
                     }
                     else if (launchScriptPieces.Length > 1)
                     {
@@ -452,13 +521,13 @@ namespace ProcessPriorityControl.Cmd
                         Console.WriteLine("  Running launch script.");
                         Console.WriteLine("    Process path: {0}", launchScriptPieces[0]);
                         Console.WriteLine("    Arguments:    {0}", arguments);
-                        Process.Start(launchScriptPieces[0], arguments);
+                        RunScript(launchScriptPieces[0], arguments);
                     }
                 }
             }
             catch (Exception exception)
             {
-                Console.WriteLine("  Error running launch script: {0}", exception.Message);
+                Console.WriteLine("  Error running launch script: [{0}] {1}", exception.GetType().ToString(), exception.Message);
             }
         }
 
@@ -487,9 +556,16 @@ namespace ProcessPriorityControl.Cmd
         {
             if (UsingPowerScripts && !HighPowerModeActive)
             {
-                Console.WriteLine("  Running high-power script");
-                Process.Start(HighPowerScriptPath);
-                HighPowerModeActive = true;
+                try
+                {
+                    Console.WriteLine("  Running high-power script");
+                    RunScript(HighPowerScriptPath);
+                    HighPowerModeActive = true;
+                }
+                catch (Exception exception)
+                {
+                    Console.WriteLine("  Error running high-power script: [{0}] {1}", exception.GetType().ToString(), exception.Message);
+                }
             }
         }
 
@@ -500,9 +576,39 @@ namespace ProcessPriorityControl.Cmd
         {
             if (UsingPowerScripts && HighPowerModeActive)
             {
-                Console.WriteLine("  Running low-power script");
-                Process.Start(LowPowerScriptPath);
-                HighPowerModeActive = false;
+                try
+                {
+                    Console.WriteLine("  Running low-power script");
+                    RunScript(LowPowerScriptPath);
+                    HighPowerModeActive = false;
+                }
+                catch (Exception exception)
+                {
+                    Console.WriteLine("  Error running high-power script: [{0}] {1}", exception.GetType().ToString(), exception.Message);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Run a script.  Adjust for running batch scripts.
+        /// </summary>
+        /// <param name="executablePath">Path to script to run</param>
+        /// <param name="arguments">Extra arguments to pass along</param>
+        private static void RunScript(string executablePath, string arguments = null)
+        {
+            if (executablePath.EndsWith(".bat"))
+            {
+                arguments = "/c " + executablePath + " " + arguments;
+                executablePath = @"C:\Windows\system32\cmd.exe";
+            }
+
+            if (arguments != null)
+            {
+                Process.Start(executablePath, arguments);
+            }
+            else
+            {
+                Process.Start(executablePath);
             }
         }
     }
