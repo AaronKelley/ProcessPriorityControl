@@ -415,6 +415,7 @@ namespace ProcessPriorityControl.Cmd
 
         /// <summary>
         /// Use the previously defined priority rules to assign priority for this process.
+        /// (Also assigns affinity if there is one set.)
         /// </summary>
         /// <param name="information">Information object for process to assign priority for</param>
         private static void AssignProcessPriority(ProcessInformation information)
@@ -488,6 +489,17 @@ namespace ProcessPriorityControl.Cmd
                 else
                 {
                     Console.WriteLine("  No priority rule match for this process");
+                }
+
+                long? processorAffinity = processWithRules.GetProcessorAffinity();
+                if (processorAffinity != null)
+                {
+                    Process process = Process.GetProcessById(information.ProcessId);
+                    if (process != null)
+                    {
+                        Console.WriteLine("  Setting processor affinity mask: {0}", String.Format("0x{0:X}", processorAffinity));
+                        process.ProcessorAffinity = (IntPtr)processorAffinity;
+                    }
                 }
             }
             catch (Exception exception)

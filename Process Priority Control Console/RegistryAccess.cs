@@ -55,6 +55,11 @@ namespace ProcessPriorityControl.Cmd
         private static readonly string HighPowerScriptValueName = "HighPowerScript";
 
         /// <summary>
+        /// Value name for an optional per-process processor affinity mask.
+        /// </summary>
+        private static readonly string ProcessorAffinityValueName = "ProcessorAffinity";
+
+        /// <summary>
         /// Set up the initial structure for the data stored in the registry.
         /// </summary>
         public static void RegistrySetup()
@@ -446,6 +451,24 @@ namespace ProcessPriorityControl.Cmd
         public static void SetPriorityForService(string serviceName, Priority priority)
         {
             Registry.SetValue(RulesBasePath + @"\Services", serviceName, priority, RegistryValueKind.DWord);
+        }
+
+        /// <summary>
+        /// Get the preferred processor affinity for a given process.
+        /// </summary>
+        /// <param name="process">A process</param>
+        /// <returns>Preferred processor affinity mask</returns>
+        public static long? GetProcessAffinity(ProcessWithRules process)
+        {
+            object result = Registry.GetValue(ProcessInformationBasePath + @"\" + process.Hash, ProcessorAffinityValueName, null);
+
+            if (result != null)
+            {
+                long affinity = long.Parse(result.ToString());
+                return affinity;
+            }
+
+            return null;
         }
     }
 }

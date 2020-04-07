@@ -63,6 +63,18 @@ namespace ProcessPriorityControl.Cmd
             return null;
         }
 
+        /// <summary>
+        /// Get the preferred processor affinity for a given process.
+        /// </summary>
+        /// <returns>Preferred processor affinity mask</returns>
+        public long? GetProcessorAffinity()
+        {
+            return RegistryAccess.GetProcessAffinity(this);
+        }
+
+        /// <summary>
+        /// Get a string for printing information about this process.
+        /// </summary>
         public override string ToString()
         {
             StringBuilder result = new StringBuilder();
