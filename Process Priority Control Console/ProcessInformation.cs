@@ -12,12 +12,12 @@ namespace ProcessPriorityControl.Cmd
         /// <summary>
         /// The Windows process that is the base for this information.
         /// </summary>
-        private Process _process;
+        private readonly Process _process;
 
         /// <summary>
         /// Parent process ID, if we have it on hand.
         /// </summary>
-        private object _parentProcessId;
+        private readonly object _parentProcessId;
 
         /// <summary>
         /// Process identifier (PID).
@@ -138,8 +138,11 @@ namespace ProcessPriorityControl.Cmd
         /// <returns>Process rules object</returns>
         public ProcessWithRules GetRulesObject()
         {
-            List<string> userSids = new List<string>();
-            userSids.Add(User.Sid);
+            List<string> userSids = new List<string>
+            {
+                User.Sid
+            };
+
             return new ProcessWithRules(Hash, ShortName, FullPath, userSids, new List<string>());
         }
 
