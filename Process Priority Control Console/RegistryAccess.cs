@@ -60,6 +60,11 @@ namespace ProcessPriorityControl.Cmd
         private static readonly string ProcessorAffinityValueName = "ProcessorAffinity";
 
         /// <summary>
+        /// Value name for an optional per-process processor affinity mask.
+        /// </summary>
+        private static readonly string KeepHighPriorityValueName = "KeepHighPriority";
+
+        /// <summary>
         /// Set up the initial structure for the data stored in the registry.
         /// </summary>
         public static void RegistrySetup()
@@ -469,6 +474,24 @@ namespace ProcessPriorityControl.Cmd
             }
 
             return null;
+        }
+
+        /// <summary>
+        /// Determine whether this process has been assigned "keep high priority" status.
+        /// </summary>
+        /// <param name="process">A process</param>
+        /// <returns>True if the process should be kept at high priority</returns>
+        public static bool IsKeepHighPriorityProcess(ProcessWithRules process)
+        {
+            object result = Registry.GetValue(ProcessInformationBasePath + @"\" + process.Hash, KeepHighPriorityValueName, null);
+
+            if (result != null)
+            {
+                long keepHighPriority = long.Parse(result.ToString());
+                return keepHighPriority == 1;
+            }
+
+            return false;
         }
     }
 }

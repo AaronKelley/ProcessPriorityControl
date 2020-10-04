@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Text;
 using System.Threading;
 
 namespace ProcessPriorityControl.Cmd
@@ -29,6 +30,11 @@ namespace ProcessPriorityControl.Cmd
         /// Tracks processes that are in the "conditional idle" set.
         /// </summary>
         private static HashSet<int> conditionalIdleProcesses;
+
+        /// <summary>
+        /// List of processes to keep at high priority, even if the priority level is lowered.
+        /// </summary>
+        private static HashSet<int> keepHighPriorityProcesses;
 
         /// <summary>
         /// Path to low-power script.
@@ -61,6 +67,7 @@ namespace ProcessPriorityControl.Cmd
             activeProcesses = new Dictionary<int, Process>();
             highPowerProcesses = new HashSet<int>();
             conditionalIdleProcesses = new HashSet<int>();
+            keepHighPriorityProcesses = new HashSet<int>();
 
             // Set up the registry structure.
             RegistryAccess.RegistrySetup();
@@ -82,6 +89,8 @@ namespace ProcessPriorityControl.Cmd
                 bool first = true;
                 CheckPowerScripts();
                 HighPowerModeActive = false;
+                int defaultTicker = 120;
+                int ticker = defaultTicker;
 
                 while (true)
                 {
@@ -94,9 +103,32 @@ namespace ProcessPriorityControl.Cmd
                         activeProcesses.Clear();
                         highPowerProcesses.Clear();
                         conditionalIdleProcesses.Clear();
+                        keepHighPriorityProcesses.Clear();
                         RegistryAccess.ClearChangesMade();
                         first = true;
                         CheckPowerScripts();
+                        ticker = defaultTicker;
+                    }
+
+                    // Output some periodic status.
+                    ticker--;
+                    if (ticker == 0)
+                    {
+                        ticker = defaultTicker;
+                        if (HighPowerModeActive)
+                        {
+                            StringBuilder highPowerProcessIds = new StringBuilder();
+                            foreach (int processId in highPowerProcesses)
+                            {
+                                if (highPowerProcessIds.Length != 0)
+                                {
+                                    highPowerProcessIds.Append(", ");
+                                }
+
+                                highPowerProcessIds.Append(processId);
+                            }
+                            Console.WriteLine("[{0}] High-power mode is active because of these processes: {1}", DateTime.Now, highPowerProcessIds);
+                        }
                     }
 
                     Process[] processes = Process.GetProcesses();
@@ -137,6 +169,15 @@ namespace ProcessPriorityControl.Cmd
                                     {
                                         Console.WriteLine("  Resetting priority for process {0} to idle", process.Id);
                                         process.PriorityClass = ProcessPriorityClass.Idle;
+                                    }
+                                }
+
+                                if (keepHighPriorityProcesses.Contains(process.Id))
+                                {
+                                    if (process.PriorityClass != ProcessPriorityClass.High)
+                                    {
+                                        Console.WriteLine("  Resetting priority for process {0} to high", process.Id);
+                                        process.PriorityClass = ProcessPriorityClass.High;
                                     }
                                 }
                             }
@@ -384,6 +425,11 @@ namespace ProcessPriorityControl.Cmd
             {
                 conditionalIdleProcesses.Remove(process.Id);
             }
+
+            if (keepHighPriorityProcesses.Contains(process.Id))
+            {
+                keepHighPriorityProcesses.Remove(process.Id);
+            }
         }
 
         /// <summary>
@@ -431,7 +477,7 @@ namespace ProcessPriorityControl.Cmd
                     foreach (string serviceName in information.ServiceNames)
                     {
                         Priority? servicePriority = RegistryAccess.GetPriorityForService(serviceName);
-                        if (servicePriority != null && servicePriority > priority)
+                        if (servicePriority != null && (priority == null || servicePriority > priority))
                         {
                             Console.WriteLine("  !! Service priority override");
                             priority = (Priority)servicePriority;
@@ -500,6 +546,11 @@ namespace ProcessPriorityControl.Cmd
                         Console.WriteLine("  Setting processor affinity mask: {0}", String.Format("0x{0:X}", processorAffinity));
                         process.ProcessorAffinity = (IntPtr)processorAffinity;
                     }
+                }
+
+                if (processWithRules.IsKeepHighPriorityProcess())
+                {
+                    keepHighPriorityProcesses.Add(information.ProcessId);
                 }
             }
             catch (Exception exception)

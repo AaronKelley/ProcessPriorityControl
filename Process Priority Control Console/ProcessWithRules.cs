@@ -73,6 +73,15 @@ namespace ProcessPriorityControl.Cmd
         }
 
         /// <summary>
+        /// Determine whether this process has been assigned "keep high priority" status.
+        /// </summary>
+        /// <returns>True if the process should be kept at high priority</returns>
+        public bool IsKeepHighPriorityProcess()
+        {
+            return RegistryAccess.IsKeepHighPriorityProcess(this);
+        }
+
+        /// <summary>
         /// Get a string for printing information about this process.
         /// </summary>
         public override string ToString()
