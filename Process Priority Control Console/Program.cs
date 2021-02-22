@@ -126,8 +126,21 @@ namespace ProcessPriorityControl.Cmd
                                 }
 
                                 highPowerProcessIds.Append(processId);
+
+                                if (!activeProcesses.ContainsKey(processId))
+                                {
+                                    highPowerProcesses.Remove(processId);
+                                    Console.WriteLine("  Removed process {0} from the high-power process set", processId);
+                                }
                             }
+
                             Console.WriteLine("[{0}] High-power mode is active because of these processes: {1}", DateTime.Now, highPowerProcessIds);
+
+                            if (highPowerProcesses.Count == 0)
+                            {
+                                Console.WriteLine("  ...shutting it off.");
+                                LowPowerMode();
+                            }
                         }
                     }
 
